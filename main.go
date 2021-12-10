@@ -23,7 +23,7 @@ type DevicePlugin struct {
 
 func NewDevicePlugin() *DevicePlugin {
 	return &DevicePlugin{
-		ticker: time.NewTicker(10 * time.Second),
+		ticker: time.NewTicker(15 * time.Second),
 		stop:   make(chan interface{}),
 	}
 }
@@ -37,10 +37,7 @@ func (m *DevicePlugin) ListenAndServe() error {
 	}
 
 	server := grpc.NewServer()
-
-	// TODO register socket with device plugin server (is this meant to be my server or kubes sserver?)
 	pluginapi.RegisterDevicePluginServer(server, m)
-
 	return server.Serve(ln)
 }
 
@@ -54,21 +51,28 @@ func (m *DevicePlugin) Shutdown() {
 // returns the new list
 //   rpc ListAndWatch(Empty) returns (stream ListAndWatchResponse) {}
 func (m *DevicePlugin) ListAndWatch(_ *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	s.Send(&pluginapi.ListAndWatchResponse{
-		Devices: []*pluginapi.Device{},
-	})
-
 	for {
 		select {
 		case <-m.stop:
 			return nil
 		// make this a timer which just scans periodically...
-		case d := <-m.ticker.C:
-			log.Printf("device %v\n", d)
+		case <-m.ticker.C:
+			// TODO implement behind a watcher which manages changes
+			log.Printf("updating device list\n")
+
+			resp := &pluginapi.ListAndWatchResponse{
+				Devices: []*pluginapi.Device{
+					{
+						ID:     "bme280-nxcore",
+						Health: pluginapi.Healthy,
+					},
+				},
+			}
+
 			// send updated list
-			s.Send(&pluginapi.ListAndWatchResponse{
-				Devices: []*pluginapi.Device{},
-			})
+			if err := s.Send(resp); err != nil {
+				return err
+			}
 		}
 	}
 }
