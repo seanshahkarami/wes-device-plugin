@@ -11,6 +11,9 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
+// The k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1 package provides all
+// the required Kubernetes device plugin .proto files and dervied Go types.
+
 type Device struct{}
 
 type DevicePlugin struct {
@@ -20,7 +23,7 @@ type DevicePlugin struct {
 
 func NewDevicePlugin() *DevicePlugin {
 	return &DevicePlugin{
-		ticker: time.NewTicker(30 * time.Second),
+		ticker: time.NewTicker(10 * time.Second),
 		stop:   make(chan interface{}),
 	}
 }
@@ -33,9 +36,11 @@ func (m *DevicePlugin) ListenAndServe() error {
 		return err
 	}
 
-	// TODO register socket with device plugin server
-
 	server := grpc.NewServer()
+
+	// TODO register socket with device plugin server (is this meant to be my server or kubes sserver?)
+	pluginapi.RegisterDevicePluginServer(server, m)
+
 	return server.Serve(ln)
 }
 
@@ -48,7 +53,7 @@ func (m *DevicePlugin) Shutdown() {
 // Whenever a Device state change or a Device disappears, ListAndWatch
 // returns the new list
 //   rpc ListAndWatch(Empty) returns (stream ListAndWatchResponse) {}
-func (m *DevicePlugin) ListAndWatch(_ pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (m *DevicePlugin) ListAndWatch(_ *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	s.Send(&pluginapi.ListAndWatchResponse{
 		Devices: []*pluginapi.Device{},
 	})
@@ -78,7 +83,7 @@ func (m *DevicePlugin) Allocate(ctx context.Context, reqs *pluginapi.AllocateReq
 
 // GetDevicePluginOptions returns options to be communicated with Device Manager.
 // rpc GetDevicePluginOptions(Empty) returns (DevicePluginOptions) {}
-func (m *DevicePlugin) GetDevicePluginOptions(_ pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (m *DevicePlugin) GetDevicePluginOptions(ctx context.Context, _ *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	// we will not provide a useful implementation for either of these functions.
 	// see the documentation about these for more info.
 	return &pluginapi.DevicePluginOptions{
